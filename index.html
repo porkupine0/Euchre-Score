@@ -139,6 +139,19 @@ details.rules summary{cursor:pointer;font-weight:700}
 .rulegrid dt{color:var(--muted)} .rulegrid dd{margin:0;font-weight:700;text-align:right}
 .rulelist{font-size:14px;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
 
+/* how to play */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tab{padding:9px 6px;border-radius:10px;font-size:15px}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.guide h3{font-family:"Bricolage Grotesque","Figtree",system-ui,sans-serif;font-size:16px;font-weight:800;color:var(--accent);margin:0}
+.guide section{display:flex;flex-direction:column;gap:6px}
+.guide p,.guide li{font-size:15px;line-height:1.55;max-width:65ch}
+.guide p{margin:0}
+.guide ul,.guide ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.rtable{display:grid;grid-template-columns:1fr auto;gap:5px 14px;font-size:15px;margin:0}
+.rtable dt{color:var(--ink)} .rtable dd{margin:0;font-weight:800;color:var(--accent);text-align:right}
+.example{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+
 /* hx:css:start */
 /* game history (shared) */
 .hx-hbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
@@ -192,7 +205,8 @@ const SUITS = [{s:"♠",n:"Spades"},{s:"♥",n:"Hearts",r:true},{s:"♦",n:"Diam
 const suitHtml = i => SUITS[i].r ? `<span class="red">${SUITS[i].s}</span>` : SUITS[i].s;
 
 const blankSetup = () => ({ teams:[{name:"",p:["",""]},{name:"",p:["",""]}], firstDealer:0, target:10 });
-let state = load() || { phase:"setup", setup:blankSetup(), teams:[], target:10, dealer0:0, hands:[] };
+let state = load() || { phase:"setup", setup:blankSetup(), teams:[], target:10, dealer0:0, hands:[], tab:"game" };
+if (!state.tab) state.tab = "game";
 let entry = null;
 let confirmKey = null, confirmTimer = null;
 
@@ -245,10 +259,65 @@ document.addEventListener("visibilitychange", keepAwake);
 function render(){
   const app = document.getElementById("app");
   const focusId = document.activeElement && document.activeElement.id;
-  app.innerHTML = state.phase === "setup" ? setupView() : playView();
+  app.innerHTML = state.tab === "guide" ? header() + guideView() : state.phase === "setup" ? setupView() : playView();
   if (focusId){ const el = document.getElementById(focusId); if (el) el.focus({preventScroll:true}); }
 }
-function header(extra=""){ return `<div class="brand"><div class="logo">${LOGO}<h1>Euchre</h1></div><div class="hx-hbtns">${hx.button()}${extra}</div></div>`; }
+function header(extra=""){ return `<div class="brand"><div class="logo">${LOGO}<h1>Euchre</h1></div><div class="hx-hbtns">${hx.button()}${extra}</div></div>
+  <div class="tabs" role="tablist"><button class="tab" role="tab" id="tab-game" data-act="tab" data-v="game" aria-selected="${state.tab==="game"}">Game</button><button class="tab" role="tab" id="tab-guide" data-act="tab" data-v="guide" aria-selected="${state.tab==="guide"}">How to play</button></div>`; }
+
+function guideView(){
+  const target = (state.phase === "play" ? state.target : state.setup.target) || 10;
+  const H = `<span class="red">♥</span>`, D = `<span class="red">♦</span>`;
+  return `<div class="panel guide">
+    <section><h2>The idea</h2><p>Euchre is a fast partnership trick-taking game played with a short deck. Each hand, one team picks trump and has to take at least 3 of the 5 tricks. If they don't, they're <b>euchred</b> and the other team scores.</p></section>
+    <section><h3>What you need</h3><ul><li>4 players in two teams of 2. Partners sit across from each other.</li><li>A 24-card deck: the 9, 10, Jack, Queen, King and Ace of each suit. Pull them out of a regular deck.</li></ul></section>
+    <section><h3>1. The deal</h3><p>The dealer gives everyone 5 cards, in batches of 2 and 3. The 4 leftover cards go face down in the middle, and the top one is turned face up. The deal passes to the left after every hand.</p></section>
+    <section><h3>2. Picking trump</h3>
+      <ol><li><b>Round 1:</b> starting left of the dealer, each player either passes or tells the dealer to pick up the face-up card. That makes its suit trump. The dealer adds the card to their hand and discards one face down.</li>
+      <li><b>Round 2:</b> if everyone passes, turn the card face down. Starting left of the dealer again, each player can name any other suit as trump, or pass.</li>
+      <li>If everyone passes twice, throw the hand in. The next player deals.</li></ol>
+      <p>The team that picked trump are the <b>makers</b> and need 3 tricks. The other team are the defenders.</p>
+      <p><b>Going alone:</b> whoever picks trump can say “alone.” Their partner lays their cards face down and sits out the hand. It's harder, but a sweep pays double.</p></section>
+    <section><h3>3. Which cards win</h3>
+      <p>In the trump suit, from highest to lowest:</p>
+      <ol><li><b>Right bower:</b> the Jack of trump.</li><li><b>Left bower:</b> the other Jack of the same color. It counts as a trump, not as its own suit.</li><li>Ace, King, Queen, 10, 9.</li></ol>
+      <p>In the other suits: Ace, King, Queen, Jack, 10, 9.</p>
+      <div class="example"><span><b>Example:</b> hearts are trump. The J${H} is the highest card, then the J${D}, then the A${H}. The J${D} is a heart for this hand, so it has to follow when hearts are led.</span></div></section>
+    <section><h3>4. Playing tricks</h3>
+      <ul><li>The player left of the dealer leads the first trick.</li>
+      <li>Going left, everyone plays one card. You must follow the suit that was led if you can. If you can't, play anything, including a trump.</li>
+      <li>The highest trump wins the trick. If no trump was played, the highest card of the suit led wins. The winner leads the next trick.</li>
+      <li>Play all 5 tricks.</li></ul></section>
+    <section><h3>5. Scoring</h3>
+      <dl class="rtable">
+        <dt>Makers take 3 or 4 tricks</dt><dd>1</dd>
+        <dt>Makers take all 5 (a <b>march</b>)</dt><dd>2</dd>
+        <dt>Going alone, take 3 or 4</dt><dd>1</dd>
+        <dt>Going alone, take all 5</dt><dd>4</dd>
+        <dt>Makers take 2 or fewer (<b>euchred</b>): defenders get</dt><dd>2</dd>
+      </dl></section>
+    <section><h3>6. Winning</h3><p>The first team to ${target} points wins.</p></section>
+    <section><h3>Strategy tips</h3>
+      <ul><li>Two bowers, or a bower and the Ace of trump, is usually enough to pick trump.</li>
+      <li>Ordering up a card to the other team's dealer gives them an extra trump. Be sure you're strong.</li>
+      <li>In round 2, the player left of the dealer often names the suit of the same color as the turned-down card. It's called <b>next</b>, and it's a classic call.</li>
+      <li>When your team picked trump, lead trump early to pull out the other team's trumps.</li>
+      <li>Think about going alone with both bowers and the Ace of trump, or with three high trumps and an outside Ace.</li>
+      <li>Don't trump a trick your partner is already winning.</li></ul></section>
+    <section><h3>Using this app</h3>
+      <ol><li>Enter both teams, pick who deals first, and choose how many points to play to.</li>
+      <li>After each hand, tap Score hand. Tap who picked trump, whether they went alone, and how many tricks their team took. The trump suit is optional, for stats.</li>
+      <li>The app scores it: made, a march, or euchred.</li>
+      <li>Tap a hand number to fix a mistake.</li></ol></section>
+    <section><h3>Glossary</h3>
+      <ul><li><b>Makers:</b> the team that picked trump.</li>
+      <li><b>Euchre:</b> stopping the makers from taking 3 tricks. It's worth 2 to the defenders.</li>
+      <li><b>March:</b> taking all 5 tricks.</li>
+      <li><b>Bowers:</b> the two Jacks of the trump color. Right is the Jack of trump, left is its twin.</li>
+      <li><b>Order up:</b> telling the dealer to pick up the face-up card in round 1.</li>
+      <li><b>Kitty:</b> the 4 cards left over after the deal.</li></ul></section>
+  </div>`;
+}
 
 function rulesCard(open){
   return `<details class="rules" ${open?"open":""}><summary>How scoring works</summary>
@@ -422,6 +491,7 @@ document.addEventListener("click", e => {
   const act = b.dataset.act, su = state.setup;
   switch(act){
     case "target": su.target = +b.dataset.v; save(); render(); break;
+    case "tab": state.tab = b.dataset.v; save(); render(); window.scrollTo(0,0); break;
     case "start": {
       state.teams = su.teams.map((t,i)=>({ name: t.name.trim() || (i===0?"Us":"Them"), p: t.p.map(x=>x.trim()) }));
       state.teams.forEach(t => t.p = t.p.map((x,k)=> x || `${t.name} ${k+1}`));
